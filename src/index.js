@@ -21,10 +21,25 @@ function verifyIfExistsAccountCPF(request, response, next) {
 
   //Fazendo isso agora toda rota que chamar esse midlleware terá acesso ao customer
   request.customer = customer;
-
+  //para passar para frente caso satisfaça tudo 
   return next();
 }
 
+function getBalance(statement){
+    //criamos uma variável para armazenar depois utilizar la no rota de withdraw
+    const balance = statement.reduce((acc, operation) => {
+        //basicamente estamos pegando o type para verificar se do tipo credit para somarmos 
+        //se não for, então ele vai subtrair da conta
+        if(operation.type === "credit"){
+            return acc + operation.amount;
+        }else{
+            return acc - operation.amount;
+        }
+    }, 0)
+    return balance;
+}
+
+// Aqui nós estamos criando um usuário com nome e cpf 
 app.post("/account", (request, response) => {
   //aqui eu estou desestruturando {cpf, name}
   const { cpf, name } = request.body;
@@ -60,4 +75,41 @@ app.get("/statement/", verifyIfExistsAccountCPF, (request, response) => {
   return response.json(customer.statement);
 });
 
+//aqui estamos criando um rota para fazer deposito 
+app.post("/deposit", verifyIfExistsAccountCPF, (request, response) =>{
+    const {description, amount} = request.body;
+
+    const {customer} = request;
+
+    const statementOperation = {
+        description,
+        amount,
+        createdAt: new Date(),
+        type: "credit"
+
+    }
+    customer.statement.push(statementOperation);
+
+    return response.status(201).send()
+
+})
+
+app.post("/withdraw", verifyIfExistsAccountCPF, (request, response) =>{
+    const {amount} = request.body;
+    const {customer}= request;
+    //aqui nós estamos pegando o resultado da funcão getBalance
+    const balance = getBalance(customer.statement)
+    if(balance > amount){
+        return response.status(400).json({error: "insufficient founds!"})
+    }
+    const statementOperation = {
+    
+        amount,
+        createdAt: new Date(),
+        type: "debit"
+
+    }
+    customer.statement.push(statementOperation)
+    return response.status(201).send()
+})
 app.listen(3333);

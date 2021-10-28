@@ -12,7 +12,7 @@ const customers = [];
 function verifyIfExistsAccountCPF(request, response, next) {
   const { cpf } = request.headers;
 
-   //verificando se há um dado dentro do customer se não tiver ele retorna a mensagem dentro do json
+  //verificando se há um dado dentro do customer se não tiver ele retorna a mensagem dentro do json
   const customer = customers.find((customer) => customer.cpf === cpf);
 
   if (!customer) {
@@ -21,25 +21,25 @@ function verifyIfExistsAccountCPF(request, response, next) {
 
   //Fazendo isso agora toda rota que chamar esse midlleware terá acesso ao customer
   request.customer = customer;
-  //para passar para frente caso satisfaça tudo 
+  //para passar para frente caso satisfaça tudo
   return next();
 }
 
-function getBalance(statement){
-    //criamos uma variável para armazenar depois utilizar la no rota de withdraw
-    const balance = statement.reduce((acc, operation) => {
-        //basicamente estamos pegando o type para verificar se do tipo credit para somarmos 
-        //se não for, então ele vai subtrair da conta
-        if(operation.type === "credit"){
-            return acc + operation.amount;
-        }else{
-            return acc - operation.amount;
-        }
-    }, 0)
-    return balance;
+function getBalance(statement) {
+  //criamos uma variável para armazenar depois utilizar la no rota de withdraw
+  const balance = statement.reduce((acc, operation) => {
+    //basicamente estamos pegando o type para verificar se do tipo credit para somarmos
+    //se não for, então ele vai subtrair da conta
+    if (operation.type === "credit") {
+      return acc + operation.amount;
+    } else {
+      return acc - operation.amount;
+    }
+  }, 0);
+  return balance;
 }
 
-// Aqui nós estamos criando um usuário com nome e cpf 
+// Aqui nós estamos criando um usuário com nome e cpf
 app.post("/account", (request, response) => {
   //aqui eu estou desestruturando {cpf, name}
   const { cpf, name } = request.body;
@@ -68,48 +68,59 @@ app.post("/account", (request, response) => {
 
 //aqui estamos criando a rota para buscarmos o cpf do cliente que criamos na rota account com o post
 app.get("/statement/", verifyIfExistsAccountCPF, (request, response) => {
-    
-    //para chamarmos o customer lá dentro do midlleware(verifyIfExistsAccountCPF) basta desestruturar
-    const {customer} = request;
+  //para chamarmos o customer lá dentro do midlleware(verifyIfExistsAccountCPF) basta desestruturar
+  const { customer } = request;
 
   return response.json(customer.statement);
 });
 
-//aqui estamos criando um rota para fazer deposito 
-app.post("/deposit", verifyIfExistsAccountCPF, (request, response) =>{
-    const {description, amount} = request.body;
+//aqui estamos criando um rota para fazer deposito
+app.post("/deposit", verifyIfExistsAccountCPF, (request, response) => {
+  const { description, amount } = request.body;
 
-    const {customer} = request;
+  const { customer } = request;
 
-    const statementOperation = {
-        description,
-        amount,
-        createdAt: new Date(),
-        type: "credit"
+  const statementOperation = {
+    description,
+    amount,
+    createdAt: new Date(),
+    type: "credit",
+  };
+  customer.statement.push(statementOperation);
 
-    }
-    customer.statement.push(statementOperation);
+  return response.status(201).send();
+});
+//aqui nessa rota estamos verificando se a conta e menor ou maior do que a pessoa quer sacar
+app.post("/withdraw", verifyIfExistsAccountCPF, (request, response) => {
+  const { amount } = request.body;
+  const { customer } = request;
+  //aqui nós estamos pegando o resultado da funcão getBalance
+  const balance = getBalance(customer.statement);
+  if (balance > amount) {
+    return response.status(400).json({ error: "insufficient founds!" });
+  }
+  const statementOperation = {
+    amount,
+    createdAt: new Date(),
+    type: "debit",
+  };
+  customer.statement.push(statementOperation);
+  return response.status(201).send();
+});
 
-    return response.status(201).send()
+app.get("/statement/date", verifyIfExistsAccountCPF, (request, response) => {
+  //para chamarmos o customer lá dentro do midlleware(verifyIfExistsAccountCPF) basta desestruturar
+  const { customer } = request;
+  const { date } = request.query;
+  //aqui estamos formatando a data
+  const dateFormat = new Date(date + " 00:00");
+  //aqui nos estamos a data para o formato 10/10/2021
+  const statement = customer.statement.filter(
+    (statement) =>
+      statement.createdAt.toDateString() === new Date(dateFormat).toDateString()
+  );
 
-})
+  return response.json(statement);
+});
 
-app.post("/withdraw", verifyIfExistsAccountCPF, (request, response) =>{
-    const {amount} = request.body;
-    const {customer}= request;
-    //aqui nós estamos pegando o resultado da funcão getBalance
-    const balance = getBalance(customer.statement)
-    if(balance > amount){
-        return response.status(400).json({error: "insufficient founds!"})
-    }
-    const statementOperation = {
-    
-        amount,
-        createdAt: new Date(),
-        type: "debit"
-
-    }
-    customer.statement.push(statementOperation)
-    return response.status(201).send()
-})
 app.listen(3333);

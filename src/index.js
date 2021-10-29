@@ -96,7 +96,7 @@ app.post("/withdraw", verifyIfExistsAccountCPF, (request, response) => {
   const { customer } = request;
   //aqui nós estamos pegando o resultado da funcão getBalance
   const balance = getBalance(customer.statement);
-  if (balance > amount) {
+  if (balance < amount) {
     return response.status(400).json({ error: "insufficient founds!" });
   }
   const statementOperation = {
@@ -122,5 +122,36 @@ app.get("/statement/date", verifyIfExistsAccountCPF, (request, response) => {
 
   return response.json(statement);
 });
+app.put("/account", verifyIfExistsAccountCPF, (request,response) => {
+  const { name } = request.body;
+  const {customer} = request;
+
+  customer.name = name;
+
+  return response.status(201).send();
+
+})
+
+app.get("/account", verifyIfExistsAccountCPF, (request, response) => {
+  const {customer} = request;
+  return response.json(customer);
+})
+
+app.delete("/account", verifyIfExistsAccountCPF, (request, response) => {
+  const {customer} = request;
+  
+
+  //metodo splice
+  customers.splice(customer, 1)
+
+  return response.status(204).json(customers)
+})
+
+app.get("/balance", verifyIfExistsAccountCPF, (request, response) => {
+  const {customer} = request;
+
+  const balance = getBalance(customer.statement)
+  return response.json(balance);
+})
 
 app.listen(3333);
